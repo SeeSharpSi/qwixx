@@ -31,6 +31,7 @@ type box struct {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.Alignment = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height).Align(lipgloss.Center, lipgloss.Center)
 		m.Height = msg.Height
 		m.Width = msg.Width
 	case tea.KeyMsg:
@@ -38,7 +39,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			m.App.send("hello")
+			m.App.send2(fmt.Sprintf("\nscreenW: %v\nscreenH: %v", m.Width, m.Height))
 		case "j":
 			m.Hovering[0] += 1
 		case "k":
@@ -56,7 +57,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 type Model struct {
 	CurrentView string
-	Hovering    [2]int
+	Hovering    [2]uint
 	*App
 	Styles
 	Turn     string
@@ -74,6 +75,8 @@ type Model struct {
 type Styles struct {
 	Viewport      viewport.Model
 	Textarea      textarea.Model
+	Border        lipgloss.Style
+	Alignment     lipgloss.Style
 	SenderStyle   lipgloss.Style
 	TxtStyle      lipgloss.Style
 	QuitStyle     lipgloss.Style
@@ -89,53 +92,22 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func InitialModel() Model {
-	ta := textarea.New()
-	ta.Placeholder = "Send a message..."
-	ta.Focus()
-
-	ta.Prompt = "┃ "
-	ta.CharLimit = 280
-
-	ta.SetWidth(30)
-	ta.SetHeight(3)
-
-	// Remove cursor line styling
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-
-	ta.ShowLineNumbers = false
-
-	vp := viewport.New(30, 5)
-	vp.SetContent(`placeholder text`)
-
-	ta.KeyMap.InsertNewline.SetEnabled(false)
-
-	return Model{
-		CurrentView: "menu",
-		Hovering:    [2]int{2, 2},
-		Styles: Styles{
-			Textarea:      ta,
-			Viewport:      vp,
-			QuitStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
-			ToolTipStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
-			HoveringStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
-		},
-		Messages: []string{},
-		Err:      nil,
-	}
-}
-
 func (m Model) View() string {
 	var s string
-	var posX = m.Hovering[0] % 10
-	var posY = m.Hovering[1] % 10
+	//var posX = m.screenpadX(0.8)
+	//var posY = m.screenpadY(0.8)
 	if m.CurrentView == "menu" {
 		for i := range 10 {
+			s += fmt.Sprint(i)
+		}
+		s += "\n"
+		for i := range 10 {
+			s += fmt.Sprint(i)
 			for j := range 10 {
-				if posX == i && posY == j {
+				if int(m.Hovering[0]%10) == i && int(m.Hovering[1]%10) == j {
 					s += m.HoveringStyle.Render("X")
 				} else {
-					s += "O"
+					s += " "
 				}
 			}
 			s += "\n"
@@ -143,7 +115,10 @@ func (m Model) View() string {
 	} else {
 		s = fmt.Sprintf("Your term is %s\nYour window size is %dx%d\nBackground: %s\nColor Profile: %s", m.Term, m.Width, m.Height, m.Bg, m.Profile)
 	}
-	return m.TxtStyle.Render(s) + "\n\n" + m.ToolTipStyle.Render("Press C to see card") + "\n\n" + m.QuitStyle.Render("Press 'q' to quit\n")
+	// s += "\nposX: " + fmt.Sprint(posX) + "\nposY: " + fmt.Sprint(posY)
+	s += "\nm.Hovering[0]: " + fmt.Sprint(m.Hovering[0]) + "\nm.Hovering[1]: " + fmt.Sprint(m.Hovering[1])
+	s = m.TxtStyle.Render(s) + "\n\n" + m.ToolTipStyle.Render("Press C to see card") + "\n\n" + m.QuitStyle.Render("Press 'q' to quit\n")
+	return m.Alignment.Render(s)
 }
 
 //app stuff
@@ -217,12 +192,40 @@ func NewApp() *App {
 }
 
 func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
-	model := InitialModel()
-	model.App = a
-	model.Player = s.User()
+	Pty, _, _ := s.Pty()
+	model := Model{
+		Player:      s.User(),
+		App:         a,
+		CurrentView: "menu",
+		Hovering:    [2]uint{2, 2},
+		Width:       Pty.Window.Width,
+		Height:      Pty.Window.Height,
+		Styles: Styles{
+			QuitStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
+			ToolTipStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+			HoveringStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
+			Alignment:     lipgloss.NewStyle().Width(Pty.Window.Width).Height(Pty.Window.Height).Align(lipgloss.Center, lipgloss.Center),
+		},
+		Messages: []string{},
+		Err:      nil,
+	}
 
 	p := tea.NewProgram(model, bubbletea.MakeOptions(s)...)
 	a.progs = append(a.progs, p)
 
 	return p
+}
+
+// returns the terminal width * a decimal percentage
+func (m Model) screenpadX(pad float64) int {
+	tmp := int(float64(m.Width) * pad)
+	print("\npadX: ", tmp)
+	return tmp
+}
+
+// returns the terminal height * a decimal percentage
+func (m Model) screenpadY(pad float64) int {
+	tmp := int(float64(m.Height) * pad)
+	print("\npadY: ", tmp)
+	return tmp
 }
