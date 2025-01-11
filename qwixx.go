@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -18,6 +19,7 @@ import (
 	"github.com/charmbracelet/wish/activeterm"
 	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/muesli/termenv"
 )
 
 // bubble tea programs have:
@@ -25,14 +27,71 @@ import (
 
 // note: use `ssh -p <port#> localhost` to connect
 
+// app contains a wish server and the list of running programs.
+type app struct {
+	*ssh.Server
+	progs []*tea.Program
+}
+
+// send dispatches a message to all running programs.
+func (a *app) send(msg tea.Msg) {
+	for _, p := range a.progs {
+		go p.Send(msg)
+	}
+}
+
+func newApp() *app {
+	a := new(app)
+	s, err := wish.NewServer(
+		wish.WithAddress(net.JoinHostPort(host, port)),
+		wish.WithHostKeyPath("./id_ed25519"),
+		wish.WithMiddleware(
+			bubbletea.MiddlewareWithProgramHandler(a.ProgramHandler, termenv.ANSI256),
+			activeterm.Middleware(),
+			logging.Middleware(),
+		),
+	)
+	if err != nil {
+		log.Error("Could not start server", "error", err)
+	}
+
+	a.Server = s
+	return a
+}
+
+func (a *app) ProgramHandler(s ssh.Session) *tea.Program {
+	model := initialModel()
+	model.app = a
+	model.player = s.User()
+
+	p := tea.NewProgram(model, bubbletea.MakeOptions(s)...)
+	a.progs = append(a.progs, p)
+
+	return p
+}
+
 type model struct {
-	term      string
-	profile   string
-	width     int
-	height    int
-	bg        string
-	txtStyle  lipgloss.Style
-	quitStyle lipgloss.Style
+	*app
+	game
+	styles
+	turn     string
+	player   string
+	term     string
+	profile  string
+	width    int
+	height   int
+	bg       string
+	messages []string
+	id       string
+	err      error
+}
+
+type styles struct {
+	viewport    viewport.Model
+	textarea    textarea.Model
+	senderStyle lipgloss.Style
+	txtStyle    lipgloss.Style
+	quitStyle   lipgloss.Style
 }
 
 type game struct {
@@ -50,8 +109,41 @@ type card struct {
 	skips  int
 }
 
+type cursor struct {
+	box [][]string
+}
+
 func initialModel() model {
-	return model{}
+	ta := textarea.New()
+	ta.Placeholder = "Send a message..."
+	ta.Focus()
+
+	ta.Prompt = "┃ "
+	ta.CharLimit = 280
+
+	ta.SetWidth(30)
+	ta.SetHeight(3)
+
+	// Remove cursor line styling
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+
+	ta.ShowLineNumbers = false
+
+	vp := viewport.New(30, 5)
+	vp.SetContent(`Welcome to the chat room!
+Type a message and press Enter to send.`)
+
+	ta.KeyMap.InsertNewline.SetEnabled(false)
+
+	return model{
+		styles: styles{
+			textarea:    ta,
+			viewport:    vp,
+			senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		},
+		messages: []string{},
+		err:      nil,
+	}
 }
 
 const (
@@ -59,24 +151,13 @@ const (
 	port = "23234"
 )
 
-func main() {
-	s, err := wish.NewServer(
-		wish.WithAddress(net.JoinHostPort(host, port)),
-		wish.WithMiddleware(
-			bubbletea.Middleware(teaHandler),
-			activeterm.Middleware(),
-			logging.Middleware(),
-		),
-	)
-	if err != nil {
-		log.Error("Could not start server,", "error", err)
-	}
-
+func (a *app) Start() {
+	var err error
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	log.Info("Starting SSH server", "host", host, "port", port)
 	go func() {
-		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+		if err = a.ListenAndServe(); err != nil {
 			log.Error("Could not start server", "error", err)
 			done <- nil
 		}
@@ -86,9 +167,14 @@ func main() {
 	log.Info("Stopping SSH server")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
-	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+	if err := a.Shutdown(ctx); err != nil {
 		log.Error("Could not stop server", "error", err)
 	}
+}
+
+func main() {
+	app := newApp()
+	app.Start()
 }
 
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
@@ -114,13 +200,15 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	m := model{
-		term:      pty.Term,
-		profile:   renderer.ColorProfile().Name(),
-		width:     pty.Window.Width,
-		height:    pty.Window.Height,
-		bg:        bg,
-		txtStyle:  txtStyle,
-		quitStyle: quitStyle,
+		term:    pty.Term,
+		profile: renderer.ColorProfile().Name(),
+		width:   pty.Window.Width,
+		height:  pty.Window.Height,
+		bg:      bg,
+		styles: styles{
+			txtStyle:  txtStyle,
+			quitStyle: quitStyle,
+		},
 	}
 	return m, []tea.ProgramOption{tea.WithAltScreen()}
 }
@@ -130,7 +218,7 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    switch msg := msg.(type) {
+	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		m.width = msg.Width
@@ -145,5 +233,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	s := fmt.Sprintf("Your term is %s\nYour window size is %dx%d\nBackground: %s\nColor Profile: %s", m.term, m.width, m.height, m.bg, m.profile)
+	s += "\ntesting"
 	return m.txtStyle.Render(s) + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n")
 }
