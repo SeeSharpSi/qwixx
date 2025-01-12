@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"seesharpsi/qwixx/game_logic"
+	"seesharpsi/qwixx/views"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -29,10 +30,9 @@ type box struct {
 }
 
 type Model struct {
-	CurrentView string
-	Hovering    [2]uint
+	views.ViewInfo
+	Pos [2]uint
 	*App
-	Styles
 	Turn     string
 	Player   string
 	Term     string
@@ -64,7 +64,6 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.Alignment = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height).Align(lipgloss.Center, lipgloss.Center)
 		m.Height = msg.Height
 		m.Width = msg.Width
 	case tea.KeyMsg:
@@ -74,13 +73,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			m.App.send2(fmt.Sprintf("\nscreenW: %v\nscreenH: %v", m.Width, m.Height))
 		case "j":
-			m.Hovering[0] += 1
+			m.Pos[0] += 1
+			if m.Pos[0] > m.MaxPos[0] {
+				m.Pos[0] -= 1
+			}
 		case "k":
-			m.Hovering[0] -= 1
+			if m.Pos[0] > 0 {
+				m.Pos[0] -= 1
+			}
 		case "l":
-			m.Hovering[1] += 1
+			m.Pos[1] += 1
+			if m.Pos[1] > m.MaxPos[1] {
+				m.Pos[1] -= 1
+			}
 		case "h":
-			m.Hovering[1] -= 1
+			if m.Pos[1] > 0 {
+				m.Pos[1] -= 1
+			}
 		}
 	case string:
 		print(msg)
@@ -89,32 +98,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	var s string = " " 
+	var s string = " "
+	var mpos [2]uint
 	//var posX = m.screenpadX(0.8)
 	//var posY = m.screenpadY(0.8)
 	if m.CurrentView == "menu" {
-		for i := range 10 {
-			s += fmt.Sprint(i)
-		}
-		s += "\n"
-		for i := range 10 {
-			s += fmt.Sprint(i)
-			for j := range 10 {
-				if int(m.Hovering[0]%10) == i && int(m.Hovering[1]%10) == j {
-					s += m.HoveringStyle.Render("X")
-				} else {
-					s += " "
-				}
-			}
-			s += "\n"
-		}
+		s, mpos = views.Menu(m.Pos, m.Width, m.Height)
+		m.MaxPos = mpos
 	} else {
 		s = fmt.Sprintf("Your term is %s\nYour window size is %dx%d\nBackground: %s\nColor Profile: %s", m.Term, m.Width, m.Height, m.Bg, m.Profile)
 	}
 	// s += "\nposX: " + fmt.Sprint(posX) + "\nposY: " + fmt.Sprint(posY)
-	s += "\nm.Hovering[0]: " + fmt.Sprint(m.Hovering[0]) + "\nm.Hovering[1]: " + fmt.Sprint(m.Hovering[1])
-	s = m.TxtStyle.Render(s) + "\n\n" + m.ToolTipStyle.Render("Press C to see card") + "\n\n" + m.QuitStyle.Render("Press 'q' to quit\n")
-	return m.Alignment.Render(s)
+	s += "\nm.Pos[0]: " + fmt.Sprint(m.Pos[0]) + "\nm.Pos[1]: " + fmt.Sprint(m.Pos[1])
+	return s
 }
 
 //app stuff
@@ -190,20 +186,17 @@ func NewApp() *App {
 func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 	Pty, _, _ := s.Pty()
 	model := Model{
-		Player:      s.User(),
-		App:         a,
-		CurrentView: "menu",
-		Hovering:    [2]uint{2, 2},
-		Width:       Pty.Window.Width,
-		Height:      Pty.Window.Height,
-		Styles: Styles{
-			QuitStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
-			ToolTipStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
-			HoveringStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
-			Alignment:     lipgloss.NewStyle().Width(Pty.Window.Width).Height(Pty.Window.Height).Align(lipgloss.Center, lipgloss.Center),
-		},
+		Player:   s.User(),
+		App:      a,
+		Pos:      [2]uint{0, 0},
+		Width:    Pty.Window.Width,
+		Height:   Pty.Window.Height,
 		Messages: []string{},
 		Err:      nil,
+		ViewInfo: views.ViewInfo{
+			CurrentView: "menu",
+			MaxPos:      [2]uint{2, 0},
+		},
 	}
 
 	p := tea.NewProgram(model, bubbletea.MakeOptions(s)...)
