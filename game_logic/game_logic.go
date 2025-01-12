@@ -12,10 +12,10 @@ type Game struct {
 
 type Card struct {
 	Player string
-	Red    map[int]bool
-	Yellow map[int]bool
-	Green  map[int]bool
-	Blue   map[int]bool
+	Red    [11]bool
+	Yellow [11]bool
+	Green  [11]bool
+	Blue   [11]bool
 	Skips  int
 }
 

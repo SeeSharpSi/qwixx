@@ -28,33 +28,6 @@ type box struct {
 	pos [][]int
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.Alignment = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height).Align(lipgloss.Center, lipgloss.Center)
-		m.Height = msg.Height
-		m.Width = msg.Width
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "enter":
-			m.App.send2(fmt.Sprintf("\nscreenW: %v\nscreenH: %v", m.Width, m.Height))
-		case "j":
-			m.Hovering[0] += 1
-		case "k":
-			m.Hovering[0] -= 1
-		case "l":
-			m.Hovering[1] += 1
-		case "h":
-			m.Hovering[1] -= 1
-		}
-	case string:
-		print(msg)
-	}
-	return m, nil
-}
-
 type Model struct {
 	CurrentView string
 	Hovering    [2]uint
@@ -84,16 +57,39 @@ type Styles struct {
 	HoveringStyle lipgloss.Style
 }
 
-type Cursor struct {
-	Box [][]string
-}
-
 func (m Model) Init() tea.Cmd {
 	return nil
 }
 
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.Alignment = lipgloss.NewStyle().Width(msg.Width).Height(msg.Height).Align(lipgloss.Center, lipgloss.Center)
+		m.Height = msg.Height
+		m.Width = msg.Width
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "enter":
+			m.App.send2(fmt.Sprintf("\nscreenW: %v\nscreenH: %v", m.Width, m.Height))
+		case "j":
+			m.Hovering[0] += 1
+		case "k":
+			m.Hovering[0] -= 1
+		case "l":
+			m.Hovering[1] += 1
+		case "h":
+			m.Hovering[1] -= 1
+		}
+	case string:
+		print(msg)
+	}
+	return m, nil
+}
+
 func (m Model) View() string {
-	var s string
+	var s string = " " 
 	//var posX = m.screenpadX(0.8)
 	//var posY = m.screenpadY(0.8)
 	if m.CurrentView == "menu" {
