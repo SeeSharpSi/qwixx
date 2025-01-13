@@ -116,7 +116,28 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "enter":
-		fmt.Printf("\nhovering: %+v\n", m.ViewInfo)
+		switch m.Pos[0] {
+		case 0:
+			playerCard := m.App.Games[0].Cards[m.Player]
+			playerCard.Red = playerCard.Red.TryMark(int(m.Pos[1]))
+			m.App.Games[0].Cards[m.Player] = playerCard
+			fmt.Printf("\nm.Pos: %+v", m.Pos)
+		case 1:
+			playerCard := m.App.Games[0].Cards[m.Player]
+			playerCard.Yellow = playerCard.Yellow.TryMark(int(m.Pos[1]))
+			m.App.Games[0].Cards[m.Player] = playerCard
+			fmt.Printf("\nm.Pos: %+v", m.Pos)
+		case 2:
+			playerCard := m.App.Games[0].Cards[m.Player]
+			playerCard.Green = playerCard.Green.TryMark(int(m.Pos[1]))
+			m.App.Games[0].Cards[m.Player] = playerCard
+			fmt.Printf("\nm.Pos: %+v", m.Pos)
+		case 3:
+			playerCard := m.App.Games[0].Cards[m.Player]
+			playerCard.Blue = playerCard.Blue.TryMark(int(m.Pos[1]))
+			m.App.Games[0].Cards[m.Player] = playerCard
+			fmt.Printf("\nm.Pos: %+v", m.Pos)
+		}
 	case "j":
 		m.Pos[0] += 1
 		if m.Pos[0] > m.MaxPos[0] {
@@ -143,16 +164,12 @@ func (m Model) View() string {
 	var s string = " "
 	switch m.ViewInfo.CurrentView {
 	case "menu":
-		fmt.Println("menu time")
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	case "stats":
-		fmt.Println("stats time")
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	case "board":
-		fmt.Println("board time")
-		s = views.CardRender(m.Pos, m.Width, m.Height, m.Game.Cards[m.Player])
+		s = views.CardRender(m.Pos, m.Width, m.Height, m.App.Games[0].Cards[m.Player])
 	case "exit":
-		fmt.Println("exit time")
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	default:
 		fmt.Println("hovering unknown value")
@@ -175,7 +192,7 @@ const (
 
 // app contains a wish server and the list of running programs.
 type App struct {
-	game_logic.Game
+	Games []game_logic.Game
 	*ssh.Server
 	progs []*tea.Program
 }
@@ -238,8 +255,25 @@ func NewApp() *App {
 
 func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 	Pty, _, _ := s.Pty()
+	player := s.User()
+	init_row := [11]bool{false, false, false, false, false, false, false, false, false, false, false}
+	card := game_logic.Card{
+		Player: player,
+		Red:    init_row,
+		Yellow: init_row,
+		Green:  init_row,
+		Blue:   init_row,
+		Skips:  4,
+	}
+	cards := make(map[string]game_logic.Card)
+	cards[player] = card
+	game := game_logic.Game{
+		Cards: cards,
+	}
+	a.Games = append(a.Games, game)
+	a.Games[len(a.Games)-1].Players = append(a.Games[0].Players, player)
 	model := Model{
-		Player:   s.User(),
+		Player:   player,
 		App:      a,
 		Pos:      [2]uint{0, 0},
 		Width:    Pty.Window.Width,

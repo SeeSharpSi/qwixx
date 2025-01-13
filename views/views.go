@@ -7,8 +7,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var tooltip lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-var hovering lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+var tooltip lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+var hovering lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Background(lipgloss.Color("0"))
+var red lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Background(lipgloss.Color("0"))
+var yellow lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Background(lipgloss.Color("0"))
+var green lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Background(lipgloss.Color("0"))
+var blue lipgloss.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Background(lipgloss.Color("0"))
+var background lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("0"))
+var cardstyle lipgloss.Style = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("0")).Padding(2).Border(lipgloss.OuterHalfBlockBorder()).BorderBackground(lipgloss.Color("0"))
 var alignment lipgloss.Style
 
 type ViewInfo struct {
@@ -69,15 +75,15 @@ func CardRender(pos [2]uint, width int, height int, card game_logic.Card) string
 	for i, v := range card.Red {
 		if v {
 			if pos == [2]uint{0, uint(i)} {
-				s += hovering.Render(fmt.Sprintf("[\033[9m%v\033[0m]", i+2))
+				s += hovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[\033[9m%v\033[0m]", i+2)
+				s += red.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			}
 		} else {
 			if pos == [2]uint{0, uint(i)} {
 				s += hovering.Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[%v]", i+2)
+				s += red.Render(fmt.Sprintf("[%v]", i+2))
 			}
 		}
 	}
@@ -85,53 +91,56 @@ func CardRender(pos [2]uint, width int, height int, card game_logic.Card) string
 	for i, v := range card.Yellow {
 		if v {
 			if pos == [2]uint{1, uint(i)} {
-				s += hovering.Render(fmt.Sprintf("[\033[9m%v\033[0m]", i+2))
+				s += hovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[\033[9m%v\033[0m]", i+2)
+				s += yellow.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			}
 		} else {
 			if pos == [2]uint{1, uint(i)} {
 				s += hovering.Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[%v]", i+2)
-			}
-		}
-	}
-	s += "\nBlue:   "
-	for i, v := range card.Blue {
-		if v {
-			if pos == [2]uint{2, uint(i)} {
-				s += hovering.Render(fmt.Sprintf("[\033[9m%v\033[0m]", i+2))
-			} else {
-				s += fmt.Sprintf("[\033[9m%v\033[0m]", i+2)
-			}
-		} else {
-			if pos == [2]uint{2, uint(i)} {
-				s += hovering.Render(fmt.Sprintf("[%v]", i+2))
-			} else {
-				s += fmt.Sprintf("[%v]", i+2)
+				s += yellow.Render(fmt.Sprintf("[%v]", i+2))
 			}
 		}
 	}
 	s += "\nGreen:  "
 	for i, v := range card.Green {
 		if v {
-			if pos == [2]uint{3, uint(i)} {
-				s += hovering.Render(fmt.Sprintf("[\033[9m%v\033[0m]", i+2))
+			if pos == [2]uint{2, uint(i)} {
+				s += hovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[\033[9m%v\033[0m]", i+2)
+				s += green.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+			}
+		} else {
+			if pos == [2]uint{2, uint(i)} {
+				s += hovering.Render(fmt.Sprintf("[%v]", i+2))
+			} else {
+				s += green.Render(fmt.Sprintf("[%v]", i+2))
+			}
+		}
+	}
+	s += "\nBlue:   "
+	for i, v := range card.Blue {
+		if v {
+			if pos == [2]uint{3, uint(i)} {
+				s += hovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+			} else {
+				s += blue.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
 			}
 		} else {
 			if pos == [2]uint{3, uint(i)} {
 				s += hovering.Render(fmt.Sprintf("[%v]", i+2))
 			} else {
-				s += fmt.Sprintf("[%v]", i+2)
+				s += blue.Render(fmt.Sprintf("[%v]", i+2))
 			}
 		}
+
 	}
 	// opts[pos[1]].display = hovering.Render(opts[pos[1]].display)
 	// s += opts[0].display + spacing + opts[1].display + spacing + opts[2].display
-	return alignment.Render(s)
+	s = cardstyle.Render(s)
+	s = alignment.Render(s)
+	return s
 }
 
 func CardInfo(pos [2]uint) (hovering string, maxPos [2]uint) {

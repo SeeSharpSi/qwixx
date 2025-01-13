@@ -2,11 +2,9 @@ package game_logic
 
 import "math/rand/v2"
 
-type Player string
-
 // a single instance of a game
 type Game struct {
-	Players []Player
+	Players []string
 	Dice    []int
 	// Card map is [player]Card
 	Cards map[string]Card
@@ -21,33 +19,33 @@ type Dice struct {
 	Blue   int
 }
 
-type row [11]bool
+type Row [11]bool
 
 type Card struct {
 	Player string
-	Red    row
-	Yellow row
-	Green  row
-	Blue   row
+	Red    Row
+	Yellow Row
+	Green  Row
+	Blue   Row
 	Skips  int
 }
 
 // Attempts to mark row at index i. Returns t/f on succes/fail
-func (r *row) TryMark(i int) (b bool) {
+func (r Row) TryMark(i int) Row {
 	if i >= len(r)-1 {
 		return r.tryRowLock()
 	}
 	for _, v := range r[i:] {
 		if v {
-			return false
+			return r
 		}
 	}
 	r[i] = true
-	return true
+	return r
 }
 
 // Attempts to lock row. Returns t/f on success/fail
-func (r *row) tryRowLock() (b bool) {
+func (r Row) tryRowLock() Row {
 	var marked int
 	for _, v := range r {
 		if v {
@@ -56,9 +54,9 @@ func (r *row) tryRowLock() (b bool) {
 	}
 	if marked >= 5 {
 		r[len(r)-1] = true
-		return true
+		return r
 	}
-	return false
+	return r
 }
 
 // Randomizes all dice
