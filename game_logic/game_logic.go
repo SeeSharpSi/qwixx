@@ -9,7 +9,7 @@ type Game struct {
 	Players []Player
 	Dice    []int
 	// Card map is [player]Card
-	Cards map[Player]Card
+	Cards map[string]Card
 }
 
 type Dice struct {

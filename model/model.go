@@ -62,43 +62,79 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Height = msg.Height
 		m.Width = msg.Width
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "enter":
-			fmt.Printf("\nhovering: %+v\n", m.ViewInfo)
-		case "j":
-			m.Pos[0] += 1
-			if m.Pos[0] > m.MaxPos[0] {
-				m.Pos[0] -= 1
-			}
-			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
-		case "k":
-			if m.Pos[0] > 0 {
-				m.Pos[0] -= 1
-			}
-			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
-		case "l":
-			m.Pos[1] += 1
-			if m.Pos[1] > m.MaxPos[1] {
-				m.Pos[1] -= 1
-			}
-			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
-		case "h":
-			if m.Pos[1] > 0 {
-				m.Pos[1] -= 1
-			}
-			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
+		switch m.ViewInfo.CurrentView {
+		case "menu":
+			m, cmd = m.menuUpdate(msg)
+		case "board":
+			m, cmd = m.cardUpdate(msg)
 		}
 	case string:
 		print(msg)
 	case views.ViewInfo:
 		m.ViewInfo = msg
+	}
+	return m, cmd
+}
+
+func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "enter":
+		m.ViewInfo.CurrentView, _ = views.MenuInfo(m.Pos)
+	case "j":
+		m.Pos[0] += 1
+		if m.Pos[0] > m.MaxPos[0] {
+			m.Pos[0] -= 1
+		}
+	case "k":
+		if m.Pos[0] > 0 {
+			m.Pos[0] -= 1
+		}
+	case "l":
+		m.Pos[1] += 1
+		if m.Pos[1] > m.MaxPos[1] {
+			m.Pos[1] -= 1
+		}
+	case "h":
+		if m.Pos[1] > 0 {
+			m.Pos[1] -= 1
+		}
+	}
+	return m, nil
+}
+
+func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
+	_, m.MaxPos = views.CardInfo(m.Pos)
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "enter":
+		fmt.Printf("\nhovering: %+v\n", m.ViewInfo)
+	case "j":
+		m.Pos[0] += 1
+		if m.Pos[0] > m.MaxPos[0] {
+			m.Pos[0] -= 1
+		}
+	case "k":
+		if m.Pos[0] > 0 {
+			m.Pos[0] -= 1
+		}
+	case "l":
+		m.Pos[1] += 1
+		if m.Pos[1] > m.MaxPos[1] {
+			m.Pos[1] -= 1
+		}
+	case "h":
+		if m.Pos[1] > 0 {
+			m.Pos[1] -= 1
+		}
 	}
 	return m, nil
 }
@@ -114,7 +150,7 @@ func (m Model) View() string {
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	case "board":
 		fmt.Println("board time")
-		s = views.MenuRender(m.Pos, m.Width, m.Height)
+		s = views.CardRender(m.Pos, m.Width, m.Height, m.Game.Cards[m.Player])
 	case "exit":
 		fmt.Println("exit time")
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
