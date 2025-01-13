@@ -71,42 +71,59 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			m.App.send2(fmt.Sprintf("\nscreenW: %v\nscreenH: %v", m.Width, m.Height))
+			fmt.Printf("\nhovering: %+v\n", m.ViewInfo)
 		case "j":
 			m.Pos[0] += 1
 			if m.Pos[0] > m.MaxPos[0] {
 				m.Pos[0] -= 1
 			}
+			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
 		case "k":
 			if m.Pos[0] > 0 {
 				m.Pos[0] -= 1
 			}
+			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
 		case "l":
 			m.Pos[1] += 1
 			if m.Pos[1] > m.MaxPos[1] {
 				m.Pos[1] -= 1
 			}
+			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
 		case "h":
 			if m.Pos[1] > 0 {
 				m.Pos[1] -= 1
 			}
+			m.CurrentView, m.MaxPos = views.MenuInfo(m.Pos)
 		}
 	case string:
 		print(msg)
+	case views.ViewInfo:
+		m.ViewInfo = msg
 	}
 	return m, nil
 }
 
 func (m Model) View() string {
 	var s string = " "
-	var mpos [2]uint
-	//var posX = m.screenpadX(0.8)
-	//var posY = m.screenpadY(0.8)
-	if m.CurrentView == "menu" {
-		s, mpos = views.Menu(m.Pos, m.Width, m.Height)
-		m.MaxPos = mpos
-	} else {
-		s = fmt.Sprintf("Your term is %s\nYour window size is %dx%d\nBackground: %s\nColor Profile: %s", m.Term, m.Width, m.Height, m.Bg, m.Profile)
+	switch m.ViewInfo.CurrentView {
+	case "menu":
+		fmt.Println("menu time")
+		s = views.MenuRender(m.Pos, m.Width, m.Height)
+	case "stats":
+		fmt.Println("stats time")
+		s = views.MenuRender(m.Pos, m.Width, m.Height)
+	case "board":
+		fmt.Println("board time")
+		s = views.MenuRender(m.Pos, m.Width, m.Height)
+	case "exit":
+		fmt.Println("exit time")
+		s = views.MenuRender(m.Pos, m.Width, m.Height)
+	default:
+		fmt.Println("hovering unknown value")
+		m.App.send(views.ViewInfo{
+			MaxPos:      [2]uint{0, 2},
+			CurrentView: "menu",
+		})
 	}
 	// s += "\nposX: " + fmt.Sprint(posX) + "\nposY: " + fmt.Sprint(posY)
 	s += "\nm.Pos[0]: " + fmt.Sprint(m.Pos[0]) + "\nm.Pos[1]: " + fmt.Sprint(m.Pos[1])
@@ -195,7 +212,7 @@ func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 		Err:      nil,
 		ViewInfo: views.ViewInfo{
 			CurrentView: "menu",
-			MaxPos:      [2]uint{2, 0},
+			MaxPos:      [2]uint{0, 2},
 		},
 	}
 

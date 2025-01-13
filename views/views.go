@@ -13,25 +13,55 @@ var alignment lipgloss.Style
 type ViewInfo struct {
 	CurrentView string
 	MaxPos      [2]uint
+	Hovering    string
 }
 
-func Menu(pos [2]uint, width int, height int) (string, ViewInfo) {
+type opt struct {
+	display string
+	val     string
+}
+
+func MenuInfo(pos [2]uint) (hovering string, maxPos [2]uint) {
+	opts := [3]opt{}
+	opts[0] = opt{
+		display: "Play",
+		val:     "board",
+	}
+	opts[1] = opt{
+		display: "Stats",
+		val:     "stats",
+	}
+	opts[2] = opt{
+		display: "Exit",
+		val:     "exit",
+	}
+	return opts[pos[1]].val, [2]uint{0, 2}
+}
+
+func MenuRender(pos [2]uint, width int, height int) string {
 	alignment = lipgloss.NewStyle().Width(width).Height(height).Align(lipgloss.Center, lipgloss.Center)
 	var s string
-	opts := make(map[uint]string)
-	opts[0] = "Play"
-	opts[1] = "Stats"
-	opts[2] = "Exit"
+	opts := [3]opt{}
+	opts[0] = opt{
+		display: "Play",
+		val:     "board",
+	}
+	opts[1] = opt{
+		display: "Stats",
+		val:     "stats",
+	}
+	opts[2] = opt{
+		display: "Exit",
+		val:     "exit",
+	}
 	spacing := "   "
-	opts[pos[0]] = hovering.Render(opts[pos[0]])
-	s += opts[0] + spacing + opts[1] + spacing + opts[2]
-	//for i, v := range opts {
-	//	s += v
-	//	if opts[i+1] != "" {
-	//		s += spacing
-	//	}
-	//}
-	return alignment.Render(s), ViewInfo{}
+	opts[pos[1]].display = hovering.Render(opts[pos[1]].display)
+	s += opts[0].display + spacing + opts[1].display + spacing + opts[2].display
+	return alignment.Render(s)
+}
+
+func Stats(pos [2]uint, width int, height int) (string, ViewInfo) {
+	return "", ViewInfo{}
 }
 
 func PCard(pos [2]int, card game_logic.Card) string {
