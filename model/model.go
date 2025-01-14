@@ -120,9 +120,41 @@ func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) takeTurn(b bool, b2 bool, turn bool, playerCard game_logic.Card) (Model, tea.Cmd) {
+    fmt.Printf("\ngone: %t\ngone2: %t\nb2: %t\n", m.Game.Gone[m.Player], m.Game.Gone2[m.Player], b2)
+	gone1 := m.Game.Gone[m.Player]
+	gone2 := m.Game.Gone2[m.Player]
+	if !b {
+		return m, nil
+	}
+	if !turn && gone1 {
+		return m, nil
+	}
+	if turn && gone1 && gone2 {
+		return m, nil
+	}
+	if turn && gone1 && !gone2 {
+		m.Game.Gone2[m.Player] = true
+	}
+
+	m.Game.Gone[m.Player] = true
+	m.Game.Gone2[m.Player] = b2
+
+	m.Game.Cards[m.Player] = playerCard
+
+	// it queries the app in case someone joines and the local model isn't up to date
+	if m.App.Games[m.Game.Key].TurnCheck() {
+		m.App.Games[m.Game.Key].ResetTurns()
+		m.App.Games[m.Game.Key].Dice.Roll()
+		m.App.send("")
+	}
+	return m, nil
+}
+
 func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	_, m.MaxPos = views.CardInfo(m.Pos)
 	var b bool
+	var b2 bool
 	turn := false
 	if m.Player == m.Game.Players[m.Game.Turn] {
 		turn = true
@@ -134,63 +166,55 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		switch m.Pos[0] {
 		case 0:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Red, b = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
-			if !b {
-				return m, nil
-			}
-			m.Game.Gone[m.Player] = true
-			m.Game.Cards[m.Player] = playerCard
-			if m.Game.TurnCheck() {
-				m.Game.ResetTurns()
-				m.Game.Dice.Roll()
-				m.App.send("")
-			}
+			playerCard.Red, b, b2 = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
+			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
+			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
+			return m, tmp2
 		case 1:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Yellow, b = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
-			if !b {
-				return m, nil
-			}
-			m.Game.Gone[m.Player] = true
-			m.Game.Cards[m.Player] = playerCard
-			if m.Game.TurnCheck() {
-				m.Game.ResetTurns()
-				m.Game.Dice.Roll()
-				m.App.send("")
-			}
+			playerCard.Yellow, b, b2 = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
+			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
+			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
+			return m, tmp2
 		case 2:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Green, b = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
-			if !b {
-				return m, nil
-			}
-			m.Game.Gone[m.Player] = true
-			m.Game.Cards[m.Player] = playerCard
-			if m.Game.TurnCheck() {
-				m.Game.ResetTurns()
-				m.Game.Dice.Roll()
-				m.App.send("")
-			}
+			playerCard.Green, b, b2 = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
+			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
+			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
+			return m, tmp2
 		case 3:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Blue, b = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
-			if !b {
-				return m, nil
-			}
+			playerCard.Blue, b, b2 = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
+			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
+			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
+			return m, tmp2
+		}
+	case "p":
+		fmt.Printf("\ngone: %t\ngone2: %t\n", m.Game.Gone[m.Player], m.Game.Gone2[m.Player])
+		if !turn {
 			m.Game.Gone[m.Player] = true
-			m.Game.Cards[m.Player] = playerCard
 			if m.Game.TurnCheck() {
 				m.Game.ResetTurns()
 				m.Game.Dice.Roll()
 				m.App.send("")
 			}
+			return m, nil
 		}
-	case "p":
+
+		if m.Game.Gone[m.Player] {
+			if m.Game.TurnCheck() {
+				m.Game.ResetTurns()
+				m.Game.Dice.Roll()
+				m.App.send("")
+			}
+			return m, nil
+		}
+		m.Game.Gone[m.Player] = true
+		m.Game.Gone2[m.Player] = true
 		b := m.TrySkip()
 		if !b {
 			return m, nil
 		}
-		m.Game.Gone[m.Player] = true
 		if m.Game.TurnCheck() {
 			m.Game.ResetTurns()
 			m.Game.Dice.Roll()
@@ -229,6 +253,7 @@ func (m Model) gameSelectUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.Game.Players = append(m.Game.Players, m.Player)
 			m.App.users = append(m.App.users, user{m.Player, m.Game.Key})
 			m.Game.Skips[m.Player] = 4
+			m.Game.Gone[m.Player] = false
 		} else {
 		}
 	case "ctrl+c":

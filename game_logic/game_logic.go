@@ -14,6 +14,7 @@ type Game struct {
 	// Card map is [player]Card
 	Cards map[string]Card
 	Gone  map[string]bool
+	Gone2 map[string]bool
 	Skips map[string]int
 }
 
@@ -50,27 +51,27 @@ func (t *Turn) nextTurn(players int) {
 }
 
 // Attempts to mark row at index i. Returns t/f on succes/fail
-func (r Row) TryMark(i int, turn bool, dice [3]Die) (Row, bool) {
+func (r Row) TryMark(i int, turn bool, dice [3]Die) (Row, bool, bool) {
 	cmp := i + 2
 	if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
 		for _, v := range r[i:] {
 			if v {
-				return r, false
+				return r, false, false
 			}
 			r[i] = true
-			return r, true
+			return r, true, true
 		}
 	}
 	if cmp == int(dice[0]+dice[1]) {
 		for _, v := range r[i:] {
 			if v {
-				return r, false
+				return r, false, false
 			}
 		}
 		r[i] = true
-		return r, true
+		return r, true, false
 	}
-	return r, false
+	return r, false, false
 }
 
 // Attempts to lock row. Returns t/f on success/fail
@@ -100,19 +101,33 @@ func (d *Dice) Roll() {
 
 func (g *Game) ResetTurns() {
 	b := make(map[string]bool)
+	c := make(map[string]bool)
 	for _, v := range g.Players {
 		b[v] = false
 	}
+	for _, v := range g.Players {
+		c[v] = false
+	}
 	g.Gone = b
+	g.Gone2 = c
 }
 
 // T if everyone has gone, F otherwise
 func (g *Game) TurnCheck() bool {
 	for _, v := range g.Gone {
 		if !v {
+			fmt.Println("returning false")
 			return false
 		}
 	}
-	g.Turn.nextTurn(len(g.Players))
-	return true
+	for _, v := range g.Gone2 {
+		if v {
+			g.Turn.nextTurn(len(g.Players))
+			fmt.Println("returning true")
+			fmt.Printf("\ngone1: %+v\ngone2: %+v\n", g.Gone, g.Gone2)
+			return true
+		}
+	}
+	fmt.Println("returning false")
+	return false
 }
