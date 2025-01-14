@@ -19,6 +19,12 @@ var background lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("0
 var bold lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("0")).Bold(true)
 var cardstyle lipgloss.Style = lipgloss.NewStyle().
 	Background(lipgloss.Color("0")).
+	Padding(2, 2, 0, 2).
+	Border(lipgloss.OuterHalfBlockBorder(), true, true, false, true).
+	BorderBackground(lipgloss.Color("0"))
+
+var dicestyle lipgloss.Style = lipgloss.NewStyle().
+	Background(lipgloss.Color("0")).
 	Padding(2).
 	Border(lipgloss.OuterHalfBlockBorder()).
 	BorderBackground(lipgloss.Color("0")).
@@ -82,7 +88,7 @@ func MenuRender(pos [2]uint, width int, height int) string {
 	return alignment.Render(s)
 }
 
-func CardRender(pos [2]uint, width int, height int, card game_logic.Card) string {
+func CardRender(pos [2]uint, width int, height int, skips int, card game_logic.Card) string {
 	var s string
 
 	s += "Red:    "
@@ -150,22 +156,35 @@ func CardRender(pos [2]uint, width int, height int, card game_logic.Card) string
 		}
 
 	}
+	s += "\n\n\nSkips:  "
+	used := 4 - skips
+	for range used {
+		s += "[X]"
+	}
+	for range skips {
+		s += "[ ]"
+	}
 	// opts[pos[1]].display = hovering.Render(opts[pos[1]].display)
 	// s += opts[0].display + spacing + opts[1].display + spacing + opts[2].display
 	s = cardstyle.Render(s)
-	return s
+	tmpBorder := lipgloss.NewStyle().Border(lipgloss.BlockBorder(), false, false, true, false).Margin(2)
+	return tmpBorder.Render(s)
 }
 
-func DiceRender(dice game_logic.Dice) string {
+func DiceRender(dice game_logic.Dice, turn bool) string {
 	var s string
-	s = "DICE"
+	s = "It is not your turn\n"
+	if turn {
+		s = "It is currently your turn\n"
+	}
+	s += "\nDICE"
 	s += "\n" + bold.Render("|") + bold.Render(fmt.Sprint(dice.White1)+bold.Render("|"))
 	s += bold.Render(fmt.Sprint(dice.White2)) + bold.Render("|")
 	s += red.Render(fmt.Sprint(dice.Red)) + bold.Render("|")
 	s += yellow.Render(fmt.Sprint(dice.Yellow)) + bold.Render("|")
 	s += green.Render(fmt.Sprint(dice.Green)) + bold.Render("|")
 	s += blue.Render(fmt.Sprint(dice.Blue)) + bold.Render("|")
-	return cardstyle.Align(lipgloss.Center).Render(s)
+	return dicestyle.Align(lipgloss.Center).Render(s)
 }
 
 func CardInfo(pos [2]uint) (hovering string, maxPos [2]uint) {

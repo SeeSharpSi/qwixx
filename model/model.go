@@ -39,9 +39,10 @@ type user struct {
 type Model struct {
 	*App
 	views.ViewInfo
-	Game     *game_logic.Game
-	Pos      [2]uint
-	Turn     string
+	Game *game_logic.Game
+	Pos  [2]uint
+	Turn string
+	// remaining skips
 	Player   string
 	Term     string
 	Profile  string
@@ -122,6 +123,10 @@ func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	_, m.MaxPos = views.CardInfo(m.Pos)
 	var b bool
+	turn := false
+	if m.Player == m.Game.Players[m.Game.Turn] {
+		turn = true
+	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -129,36 +134,67 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		switch m.Pos[0] {
 		case 0:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Red, b = playerCard.Red.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
+			playerCard.Red, b = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
 			if !b {
 				return m, nil
 			}
+			m.Game.Gone[m.Player] = true
 			m.Game.Cards[m.Player] = playerCard
-			m.Game.Dice.Roll()
+			if m.Game.TurnCheck() {
+				m.Game.ResetTurns()
+				m.Game.Dice.Roll()
+				m.App.send("")
+			}
 		case 1:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Yellow, b = playerCard.Yellow.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
+			playerCard.Yellow, b = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
 			if !b {
 				return m, nil
 			}
+			m.Game.Gone[m.Player] = true
 			m.Game.Cards[m.Player] = playerCard
-			m.Game.Dice.Roll()
+			if m.Game.TurnCheck() {
+				m.Game.ResetTurns()
+				m.Game.Dice.Roll()
+				m.App.send("")
+			}
 		case 2:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Green, b = playerCard.Green.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
+			playerCard.Green, b = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
 			if !b {
 				return m, nil
 			}
+			m.Game.Gone[m.Player] = true
 			m.Game.Cards[m.Player] = playerCard
-			m.Game.Dice.Roll()
+			if m.Game.TurnCheck() {
+				m.Game.ResetTurns()
+				m.Game.Dice.Roll()
+				m.App.send("")
+			}
 		case 3:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Blue, b = playerCard.Blue.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
+			playerCard.Blue, b = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
 			if !b {
 				return m, nil
 			}
+			m.Game.Gone[m.Player] = true
 			m.Game.Cards[m.Player] = playerCard
+			if m.Game.TurnCheck() {
+				m.Game.ResetTurns()
+				m.Game.Dice.Roll()
+				m.App.send("")
+			}
+		}
+	case "p":
+		b := m.TrySkip()
+		if !b {
+			return m, nil
+		}
+		m.Game.Gone[m.Player] = true
+		if m.Game.TurnCheck() {
+			m.Game.ResetTurns()
 			m.Game.Dice.Roll()
+			m.App.send("")
 		}
 	case "j":
 		m.Pos[0] += 1
@@ -192,6 +228,7 @@ func (m Model) gameSelectUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.CurrentView = "card"
 			m.Game.Players = append(m.Game.Players, m.Player)
 			m.App.users = append(m.App.users, user{m.Player, m.Game.Key})
+			m.Game.Skips[m.Player] = 4
 		} else {
 		}
 	case "ctrl+c":
@@ -205,6 +242,7 @@ func (m Model) gameSelectUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 func (m Model) View() string {
 	var s string = " "
+	turn := false
 	switch m.ViewInfo.CurrentView {
 	case "menu":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
@@ -213,8 +251,11 @@ func (m Model) View() string {
 	case "stats":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	case "card":
-		s = views.DiceRender(m.Game.Dice)
-		s += "\n" + views.CardRender(m.Pos, m.Width, m.Height, m.Game.Cards[m.Player])
+		if m.Player == m.Game.Players[m.Game.Turn] {
+			turn = true
+		}
+		s = views.DiceRender(m.Game.Dice, turn)
+		s += "\n" + views.CardRender(m.Pos, m.Width, m.Height, m.Game.Skips[m.Player], m.Game.Cards[m.Player])
 		s += "\n" + m.Game.Key
 	case "exit":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
@@ -325,36 +366,25 @@ func handleDisconnectMiddleware(a *App) wish.Middleware {
 	}
 }
 
+// Log or handle a disconnection
 func handleDisconnect(s ssh.Session, a *App) {
-	// Log or handle the disconnection
-	fmt.Print("0.1")
 	user := s.User()
 	for _, v := range a.users {
-		fmt.Print("0.2")
 		if v.Player == user {
-			fmt.Print("0.3")
 			game := a.Games[v.Gamekey]
-			fmt.Print("0.4")
 			if game != nil {
 				game.Players = remove(game.Players, user)
-				fmt.Print("0.5")
+				delete(game.Gone, user)
 				a.Games[v.Gamekey] = game
-				fmt.Print("0.6")
 			}
 		}
 	}
 
-	fmt.Println("1")
 	for _, v := range a.users {
-		fmt.Println("2")
 		game := a.Games[v.Gamekey]
-		fmt.Println("2.5")
 		if game != nil {
-			fmt.Println("3")
 			if len(game.Players) == 0 {
-				fmt.Println("4")
 				delete(a.Games, v.Gamekey)
-				fmt.Println("5")
 			}
 		}
 	}
@@ -400,6 +430,14 @@ func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 	return p
 }
 
+func (m *Model) TrySkip() bool {
+	if m.Game.Skips[m.Player] > 0 {
+		m.Game.Skips[m.Player]--
+		return true
+	}
+	return false
+}
+
 func (a *App) createNewGame(m Model) (*game_logic.Game, string) {
 	player := m.Player
 	init_row := [11]bool{false, false, false, false, false, false, false, false, false, false, false}
@@ -413,31 +451,23 @@ func (a *App) createNewGame(m Model) (*game_logic.Game, string) {
 	}
 	cards := make(map[string]game_logic.Card)
 	cards[player] = card
+	skips := make(map[string]int)
+	skips[player] = 4
 	gamekey := keygen(4)
 	game := game_logic.Game{
 		Key:     gamekey,
 		Cards:   cards,
 		Players: []string{player},
+		Gone:    make(map[string]bool),
+		Skips:   skips,
+		Turn:    0,
 	}
 	game.Dice.Roll()
 	a.Games[gamekey] = &game
 	m.Game = &game
+	m.Game.ResetTurns()
 	m.App.users = append(m.App.users, user{m.Player, m.Game.Key})
 	return &game, gamekey
-}
-
-// returns the terminal width * a decimal percentage
-func (m Model) screenpadX(pad float64) int {
-	tmp := int(float64(m.Width) * pad)
-	print("\npadX: ", tmp)
-	return tmp
-}
-
-// returns the terminal height * a decimal percentage
-func (m Model) screenpadY(pad float64) int {
-	tmp := int(float64(m.Height) * pad)
-	print("\npadY: ", tmp)
-	return tmp
 }
 
 func keygen(n int) string {

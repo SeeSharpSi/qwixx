@@ -13,6 +13,8 @@ type Game struct {
 	Turn
 	// Card map is [player]Card
 	Cards map[string]Card
+	Gone  map[string]bool
+	Skips map[string]int
 }
 
 type Dice struct {
@@ -39,12 +41,12 @@ type Card struct {
 
 type Turn int
 
-func (t *Turn) NextTurn(players int) {
-	tmp := *t
-	if int(tmp) > players {
-		tmp = 0
+func (t *Turn) nextTurn(players int) {
+	fmt.Println("\nnextturn called\n")
+	*t++
+	if int(*t) > players-1 {
+		*t = 0
 	}
-	t = &tmp
 }
 
 // Attempts to mark row at index i. Returns t/f on succes/fail
@@ -62,7 +64,6 @@ func (r Row) TryMark(i int, turn bool, dice [3]Die) (Row, bool) {
 	if cmp == int(dice[0]+dice[1]) {
 		for _, v := range r[i:] {
 			if v {
-				fmt.Println("2")
 				return r, false
 			}
 		}
@@ -95,4 +96,23 @@ func (d *Dice) Roll() {
 	d.Yellow = Die(rand.IntN(6) + 1)
 	d.Green = Die(rand.IntN(6) + 1)
 	d.Blue = Die(rand.IntN(6) + 1)
+}
+
+func (g *Game) ResetTurns() {
+	b := make(map[string]bool)
+	for _, v := range g.Players {
+		b[v] = false
+	}
+	g.Gone = b
+}
+
+// T if everyone has gone, F otherwise
+func (g *Game) TurnCheck() bool {
+	for _, v := range g.Gone {
+		if !v {
+			return false
+		}
+	}
+	g.Turn.nextTurn(len(g.Players))
+	return true
 }
