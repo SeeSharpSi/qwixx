@@ -3,16 +3,18 @@ package model
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"seesharpsi/qwixx/game_logic"
 	"seesharpsi/qwixx/views"
 
-	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -29,10 +31,16 @@ type box struct {
 	pos [][]int
 }
 
+type user struct {
+	Player  string
+	Gamekey string
+}
+
 type Model struct {
-	views.ViewInfo
-	Pos [2]uint
 	*App
+	views.ViewInfo
+	Game     *game_logic.Game
+	Pos      [2]uint
 	Turn     string
 	Player   string
 	Term     string
@@ -43,18 +51,12 @@ type Model struct {
 	Messages []string
 	Id       string
 	Err      error
+	Styles
 }
 
 type Styles struct {
-	Viewport      viewport.Model
-	Textarea      textarea.Model
-	Border        lipgloss.Style
-	Alignment     lipgloss.Style
-	SenderStyle   lipgloss.Style
-	TxtStyle      lipgloss.Style
-	QuitStyle     lipgloss.Style
-	ToolTipStyle  lipgloss.Style
-	HoveringStyle lipgloss.Style
+	Viewport  viewport.Model
+	TextInput textinput.Model
 }
 
 func (m Model) Init() tea.Cmd {
@@ -71,8 +73,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.ViewInfo.CurrentView {
 		case "menu":
 			m, cmd = m.menuUpdate(msg)
-		case "board":
+		case "card":
 			m, cmd = m.cardUpdate(msg)
+		case "gameselect":
+			m, cmd = m.gameSelectUpdate(msg)
 		}
 	case string:
 		print(msg)
@@ -88,6 +92,11 @@ func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	case "enter":
 		m.ViewInfo.CurrentView, _ = views.MenuInfo(m.Pos)
+		if m.ViewInfo.CurrentView == "creategame" {
+			m.Game, m.Game.Key = m.App.createNewGame(m)
+			m.Pos = [2]uint{0, 0}
+			m.ViewInfo.CurrentView = "card"
+		}
 	case "j":
 		m.Pos[0] += 1
 		if m.Pos[0] > m.MaxPos[0] {
@@ -112,31 +121,44 @@ func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	_, m.MaxPos = views.CardInfo(m.Pos)
+	var b bool
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "enter":
 		switch m.Pos[0] {
 		case 0:
-			playerCard := m.App.Games[0].Cards[m.Player]
-			playerCard.Red = playerCard.Red.TryMark(int(m.Pos[1]))
-			m.App.Games[0].Cards[m.Player] = playerCard
-			fmt.Printf("\nm.Pos: %+v", m.Pos)
+			playerCard := m.Game.Cards[m.Player]
+			playerCard.Red, b = playerCard.Red.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
+			if !b {
+				return m, nil
+			}
+			m.Game.Cards[m.Player] = playerCard
+			m.Game.Dice.Roll()
 		case 1:
-			playerCard := m.App.Games[0].Cards[m.Player]
-			playerCard.Yellow = playerCard.Yellow.TryMark(int(m.Pos[1]))
-			m.App.Games[0].Cards[m.Player] = playerCard
-			fmt.Printf("\nm.Pos: %+v", m.Pos)
+			playerCard := m.Game.Cards[m.Player]
+			playerCard.Yellow, b = playerCard.Yellow.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
+			if !b {
+				return m, nil
+			}
+			m.Game.Cards[m.Player] = playerCard
+			m.Game.Dice.Roll()
 		case 2:
-			playerCard := m.App.Games[0].Cards[m.Player]
-			playerCard.Green = playerCard.Green.TryMark(int(m.Pos[1]))
-			m.App.Games[0].Cards[m.Player] = playerCard
-			fmt.Printf("\nm.Pos: %+v", m.Pos)
+			playerCard := m.Game.Cards[m.Player]
+			playerCard.Green, b = playerCard.Green.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
+			if !b {
+				return m, nil
+			}
+			m.Game.Cards[m.Player] = playerCard
+			m.Game.Dice.Roll()
 		case 3:
-			playerCard := m.App.Games[0].Cards[m.Player]
-			playerCard.Blue = playerCard.Blue.TryMark(int(m.Pos[1]))
-			m.App.Games[0].Cards[m.Player] = playerCard
-			fmt.Printf("\nm.Pos: %+v", m.Pos)
+			playerCard := m.Game.Cards[m.Player]
+			playerCard.Blue, b = playerCard.Blue.TryMark(int(m.Pos[1]), false, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
+			if !b {
+				return m, nil
+			}
+			m.Game.Cards[m.Player] = playerCard
+			m.Game.Dice.Roll()
 		}
 	case "j":
 		m.Pos[0] += 1
@@ -160,15 +182,40 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) gameSelectUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg.String() {
+	case "enter":
+		v, ok := m.App.Games[m.TextInput.Value()]
+		if ok {
+			m.Game = v
+			m.CurrentView = "card"
+			m.Game.Players = append(m.Game.Players, m.Player)
+			m.App.users = append(m.App.users, user{m.Player, m.Game.Key})
+		} else {
+		}
+	case "ctrl+c":
+		return m, tea.Quit
+	default:
+		m.TextInput, cmd = m.TextInput.Update(msg)
+
+	}
+	return m, cmd
+}
+
 func (m Model) View() string {
 	var s string = " "
 	switch m.ViewInfo.CurrentView {
 	case "menu":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
+	case "gameselect":
+		s = views.GameSelectRender(m.App.Games, m.TextInput, m.Width, m.Height)
 	case "stats":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
-	case "board":
-		s = views.CardRender(m.Pos, m.Width, m.Height, m.App.Games[0].Cards[m.Player])
+	case "card":
+		s = views.DiceRender(m.Game.Dice)
+		s += "\n" + views.CardRender(m.Pos, m.Width, m.Height, m.Game.Cards[m.Player])
+		s += "\n" + m.Game.Key
 	case "exit":
 		s = views.MenuRender(m.Pos, m.Width, m.Height)
 	default:
@@ -180,7 +227,8 @@ func (m Model) View() string {
 	}
 	// s += "\nposX: " + fmt.Sprint(posX) + "\nposY: " + fmt.Sprint(posY)
 	s += "\nm.Pos[0]: " + fmt.Sprint(m.Pos[0]) + "\nm.Pos[1]: " + fmt.Sprint(m.Pos[1])
-	return s
+	alignment := lipgloss.NewStyle().Width(m.Width).Height(m.Height).Align(lipgloss.Center, lipgloss.Center)
+	return alignment.Render(s)
 }
 
 //app stuff
@@ -192,9 +240,10 @@ const (
 
 // app contains a wish server and the list of running programs.
 type App struct {
-	Games []game_logic.Game
+	Games map[string]*game_logic.Game
 	*ssh.Server
 	progs []*tea.Program
+	users []user
 }
 
 // I need the app to send a msg that adds a card and player when someone joins the game
@@ -236,10 +285,12 @@ func (a *App) Start() {
 
 func NewApp() *App {
 	a := new(App)
+	a.Games = make(map[string]*game_logic.Game)
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath("./id_ed25519"),
 		wish.WithMiddleware(
+			handleDisconnectMiddleware(a),
 			bubbletea.MiddlewareWithProgramHandler(a.ProgramHandler, termenv.ANSI256),
 			activeterm.Middleware(),
 			logging.Middleware(),
@@ -253,25 +304,79 @@ func NewApp() *App {
 	return a
 }
 
+func handleDisconnectMiddleware(a *App) wish.Middleware {
+	return func(next ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			// Get the session context
+			ctx := s.Context()
+
+			// Run the disconnection handler in a goroutine
+			go func() {
+				select {
+				case <-ctx.Done():
+					// The user disconnected
+					handleDisconnect(s, a)
+				}
+			}()
+
+			// Call the next handler in the chain
+			next(s)
+		}
+	}
+}
+
+func handleDisconnect(s ssh.Session, a *App) {
+	// Log or handle the disconnection
+	fmt.Print("0.1")
+	user := s.User()
+	for _, v := range a.users {
+		fmt.Print("0.2")
+		if v.Player == user {
+			fmt.Print("0.3")
+			game := a.Games[v.Gamekey]
+			fmt.Print("0.4")
+			if game != nil {
+				game.Players = remove(game.Players, user)
+				fmt.Print("0.5")
+				a.Games[v.Gamekey] = game
+				fmt.Print("0.6")
+			}
+		}
+	}
+
+	fmt.Println("1")
+	for _, v := range a.users {
+		fmt.Println("2")
+		game := a.Games[v.Gamekey]
+		fmt.Println("2.5")
+		if game != nil {
+			fmt.Println("3")
+			if len(game.Players) == 0 {
+				fmt.Println("4")
+				delete(a.Games, v.Gamekey)
+				fmt.Println("5")
+			}
+		}
+	}
+}
+
+func remove(l []string, item string) []string {
+	for i, other := range l {
+		if other == item {
+			return append(l[:i], l[i+1:]...)
+		}
+	}
+	return l
+}
+
 func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 	Pty, _, _ := s.Pty()
+	ti := textinput.New()
+	ti.Placeholder = "Enter game id..."
+	ti.Focus()
+	ti.Width = 20
+	ti.CharLimit = 4
 	player := s.User()
-	init_row := [11]bool{false, false, false, false, false, false, false, false, false, false, false}
-	card := game_logic.Card{
-		Player: player,
-		Red:    init_row,
-		Yellow: init_row,
-		Green:  init_row,
-		Blue:   init_row,
-		Skips:  4,
-	}
-	cards := make(map[string]game_logic.Card)
-	cards[player] = card
-	game := game_logic.Game{
-		Cards: cards,
-	}
-	a.Games = append(a.Games, game)
-	a.Games[len(a.Games)-1].Players = append(a.Games[0].Players, player)
 	model := Model{
 		Player:   player,
 		App:      a,
@@ -284,12 +389,41 @@ func (a *App) ProgramHandler(s ssh.Session) *tea.Program {
 			CurrentView: "menu",
 			MaxPos:      [2]uint{0, 2},
 		},
+		Styles: Styles{
+			TextInput: ti,
+		},
+		Game: &game_logic.Game{},
 	}
 
 	p := tea.NewProgram(model, bubbletea.MakeOptions(s)...)
 	a.progs = append(a.progs, p)
-
 	return p
+}
+
+func (a *App) createNewGame(m Model) (*game_logic.Game, string) {
+	player := m.Player
+	init_row := [11]bool{false, false, false, false, false, false, false, false, false, false, false}
+	card := game_logic.Card{
+		Player: player,
+		Red:    init_row,
+		Yellow: init_row,
+		Green:  init_row,
+		Blue:   init_row,
+		Skips:  4,
+	}
+	cards := make(map[string]game_logic.Card)
+	cards[player] = card
+	gamekey := keygen(4)
+	game := game_logic.Game{
+		Key:     gamekey,
+		Cards:   cards,
+		Players: []string{player},
+	}
+	game.Dice.Roll()
+	a.Games[gamekey] = &game
+	m.Game = &game
+	m.App.users = append(m.App.users, user{m.Player, m.Game.Key})
+	return &game, gamekey
 }
 
 // returns the terminal width * a decimal percentage
@@ -304,4 +438,30 @@ func (m Model) screenpadY(pad float64) int {
 	tmp := int(float64(m.Height) * pad)
 	print("\npadY: ", tmp)
 	return tmp
+}
+
+func keygen(n int) string {
+	const (
+		letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		letterIdxBits = 6                    // 6 bits to represent a letter index
+		letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+		letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	)
+
+	var src = rand.NewSource(time.Now().UnixNano())
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return *(*string)(unsafe.Pointer(&b))
 }
