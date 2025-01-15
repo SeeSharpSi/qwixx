@@ -134,11 +134,11 @@ func (m Model) takeTurn(b bool, b2 bool, turn bool, playerCard game_logic.Card) 
 	}
 	if turn && gone1 && !gone2 {
 		m.Game.Gone2[m.Player] = true
+
 	}
 
-	m.Game.Gone[m.Player] = true
 	m.Game.Gone2[m.Player] = b2
-
+	m.Game.Gone[m.Player] = true
 	m.Game.Cards[m.Player] = playerCard
 
 	// it queries the app in case someone joines and the local model isn't up to date
@@ -164,8 +164,12 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 	var b bool
 	var b2 bool
 	turn := false
+	turngone := false
 	if m.Player == m.Game.Players[m.Game.Turn] {
 		turn = true
+	}
+	if m.Game.Gone[m.Player] && turn {
+		turngone = true
 	}
 	switch msg.String() {
 	case "q", "ctrl+c":
@@ -174,25 +178,25 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		switch m.Pos[0] {
 		case 0:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Red, b, b2 = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red}, false)
+			playerCard.Red, b, b2 = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red}, false, turngone)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 1:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Yellow, b, b2 = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow}, false)
+			playerCard.Yellow, b, b2 = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow}, false, turngone)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 2:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Green, b, b2 = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green}, true)
+			playerCard.Green, b, b2 = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green}, true, turngone)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 3:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Blue, b, b2 = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue}, true)
+			playerCard.Blue, b, b2 = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue}, true, turngone)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
@@ -201,6 +205,7 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		card := m.Game.Cards[m.Player]
 		card.TurnOver = true
 		m.Game.Cards[m.Player] = card
+		fmt.Printf("\nGone1: %+v\nGone2: %+v\n", m.Game.Gone[m.Player], m.Game.Gone[m.Player])
 		if !turn {
 			m.Game.Gone[m.Player] = true
 			if m.Game.TurnCheck() {
@@ -208,10 +213,10 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.Game.Dice.Roll()
 				m.App.send("")
 			}
-            return m, nil
+			return m, nil
 		}
 
-		if m.Game.Gone[m.Player] {
+		if m.Game.Gone[m.Player] || m.Game.Gone2[m.Player] {
 			if m.Game.TurnCheck() {
 				m.Game.ResetTurns()
 				m.Game.Dice.Roll()
@@ -219,12 +224,12 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.Game.Gone[m.Player] = true
-		m.Game.Gone2[m.Player] = true
 		b := m.TrySkip()
 		if !b {
 			return m, nil
 		}
+		m.Game.Gone[m.Player] = true
+		m.Game.Gone2[m.Player] = true
 		if m.Game.TurnCheck() {
 			m.Game.ResetTurns()
 			m.Game.Dice.Roll()
@@ -301,8 +306,6 @@ func (m Model) View() string {
 			CurrentView: "menu",
 		})
 	}
-	// s += "\nposX: " + fmt.Sprint(posX) + "\nposY: " + fmt.Sprint(posY)
-	s += "\nm.Pos[0]: " + fmt.Sprint(m.Pos[0]) + "\nm.Pos[1]: " + fmt.Sprint(m.Pos[1])
 	alignment := lipgloss.NewStyle().Width(m.Width).Height(m.Height).Align(lipgloss.Center, lipgloss.Center)
 	return alignment.Render(s)
 }

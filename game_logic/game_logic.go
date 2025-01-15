@@ -16,6 +16,8 @@ type Game struct {
 	Gone  map[string]bool
 	Gone2 map[string]bool
 	Skips map[string]int
+	// Keys should be red, yellow, green, blue
+	RowsLocked map[string]bool
 }
 
 type Dice struct {
@@ -51,10 +53,15 @@ func (t *Turn) nextTurn(players int) {
 }
 
 // Attempts to mark row at index i. Returns t/f on succes/fail
-func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool) (Row, bool, bool) {
+func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool, turngone bool) (Row, bool, bool) {
+	fmt.Printf("\ntg: %t\n", turngone)
 	if !large {
 		cmp := i + 2
-		if cmp == int(dice[0]+dice[1]) {
+		if cmp == int(dice[0]+dice[1]) && !turngone {
+			if cmp == 12 {
+				tmp1, tmp2 := r.tryRowLock()
+				return tmp1, tmp2, false
+			}
 			for _, v := range r[i:] {
 				if v {
 					return r, false, false
@@ -64,6 +71,10 @@ func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool) (Row, bool, bool
 			return r, true, false
 		}
 		if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
+			if cmp == 12 {
+				tmp1, tmp2 := r.tryRowLock()
+				return tmp1, tmp2, tmp2
+			}
 			for _, v := range r[i:] {
 				if v {
 					return r, false, false
@@ -76,16 +87,11 @@ func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool) (Row, bool, bool
 	}
 
 	cmp := 12 - i
-	if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
-		for _, v := range r[i:] {
-			if v {
-				return r, false, false
-			}
-			r[i] = true
-			return r, true, true
+	if cmp == int(dice[0]+dice[1]) && !turngone {
+		if cmp == 2 {
+			tmp1, tmp2 := r.tryRowLock()
+			return tmp1, tmp2, false
 		}
-	}
-	if cmp == int(dice[0]+dice[1]) {
 		for _, v := range r[i:] {
 			if v {
 				return r, false, false
@@ -93,6 +99,19 @@ func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool) (Row, bool, bool
 		}
 		r[i] = true
 		return r, true, false
+	}
+	if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
+		if cmp == 2 {
+			tmp1, tmp2 := r.tryRowLock()
+			return tmp1, tmp2, tmp2
+		}
+		for _, v := range r[i:] {
+			if v {
+				return r, false, false
+			}
+			r[i] = true
+			return r, true, true
+		}
 	}
 	return r, false, false
 }

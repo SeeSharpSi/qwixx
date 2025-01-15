@@ -30,6 +30,13 @@ var dicestyle lipgloss.Style = lipgloss.NewStyle().
 	Border(lipgloss.OuterHalfBlockBorder()).
 	BorderBackground(lipgloss.Color("0")).
 	Margin(2)
+var dicestyle2 lipgloss.Style = lipgloss.NewStyle().
+	Background(lipgloss.Color("0")).
+	Padding(2).
+	Border(lipgloss.OuterHalfBlockBorder()).
+	BorderBackground(lipgloss.Color("0")).
+	BorderForeground(lipgloss.Color("5")).
+	Margin(2)
 
 type ViewInfo struct {
 	CurrentView string
@@ -256,7 +263,11 @@ func DiceRender(dice game_logic.Dice, turn bool) string {
 	s += yellow.Render(fmt.Sprint(dice.Yellow)) + bold.Render("|")
 	s += green.Render(fmt.Sprint(dice.Green)) + bold.Render("|")
 	s += blue.Render(fmt.Sprint(dice.Blue)) + bold.Render("|")
-	return dicestyle.Align(lipgloss.Center).Render(s)
+	if turn {
+		return dicestyle2.Align(lipgloss.Center).Render(s)
+	} else {
+		return dicestyle.Align(lipgloss.Center).Render(s)
+	}
 }
 
 func CardInfo(pos [2]uint) (hovering string, maxPos [2]uint) {
