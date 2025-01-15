@@ -20,8 +20,9 @@ var bold lipgloss.Style = lipgloss.NewStyle().Background(lipgloss.Color("0")).Bo
 var cardstyle lipgloss.Style = lipgloss.NewStyle().
 	Background(lipgloss.Color("0")).
 	Padding(2, 2, 0, 2).
-	Border(lipgloss.OuterHalfBlockBorder(), true, true, false, true).
-	BorderBackground(lipgloss.Color("0"))
+	Border(lipgloss.OuterHalfBlockBorder(), true, true, true, true).
+	BorderBackground(lipgloss.Color("0")).
+	Margin(2)
 
 var dicestyle lipgloss.Style = lipgloss.NewStyle().
 	Background(lipgloss.Color("0")).
@@ -90,73 +91,145 @@ func MenuRender(pos [2]uint, width int, height int) string {
 
 func CardRender(pos [2]uint, width int, height int, skips int, card game_logic.Card) string {
 	var s string
+	if card.TurnOver {
+		cardstyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("0")).
+			Padding(2, 2, 0, 2).
+			Border(lipgloss.OuterHalfBlockBorder(), true, true, true, true).
+			BorderBackground(lipgloss.Color("0")).
+			BorderForeground(lipgloss.Color("8")).
+			Margin(2)
+	} else {
+		cardstyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("0")).
+			Padding(2, 2, 0, 2).
+			Border(lipgloss.OuterHalfBlockBorder(), true, true, true, true).
+			BorderBackground(lipgloss.Color("0")).
+			Margin(2)
+	}
 
 	s += "Red:    "
 	for i, v := range card.Red {
 		if v {
 			if pos == [2]uint{0, uint(i)} {
-				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			} else {
-				s += red.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += red.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			}
 		} else {
+			spacing := ""
+			if i+2 < 10 {
+				spacing = " "
+			}
 			if pos == [2]uint{0, uint(i)} {
-				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2))
+				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			} else {
-				s += red.Render(fmt.Sprintf("[%v]", i+2))
+				s += red.Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			}
 		}
 	}
-	s += "\nYellow: "
+	s += "\n\nYellow: "
 	for i, v := range card.Yellow {
 		if v {
 			if pos == [2]uint{1, uint(i)} {
-				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			} else {
-				s += yellow.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += yellow.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			}
 		} else {
 			if pos == [2]uint{1, uint(i)} {
-				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			} else {
-				s += yellow.Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if i+2 < 10 {
+					spacing = " "
+				}
+				s += yellow.Render(fmt.Sprintf("[%v]", i+2)) + background.Render(spacing)
 			}
 		}
 	}
-	s += "\nGreen:  "
+	s += "\n\nGreen:  "
 	for i, v := range card.Green {
 		if v {
 			if pos == [2]uint{2, uint(i)} {
-				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			} else {
-				s += green.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += green.Strikethrough(true).Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			}
 		} else {
+			spacing := ""
+			if 12-i < 10 {
+				spacing = " "
+			}
 			if pos == [2]uint{2, uint(i)} {
-				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2))
+				s += cardhovering.Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			} else {
-				s += green.Render(fmt.Sprintf("[%v]", i+2))
+				s += green.Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			}
 		}
 	}
-	s += "\nBlue:   "
+	s += "\n\nBlue:   "
 	for i, v := range card.Blue {
 		if v {
 			if pos == [2]uint{3, uint(i)} {
-				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Strikethrough(true).Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			} else {
-				s += blue.Strikethrough(true).Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += blue.Strikethrough(true).Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			}
 		} else {
 			if pos == [2]uint{3, uint(i)} {
-				s += cardhovering.Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += cardhovering.Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			} else {
-				s += blue.Render(fmt.Sprintf("[%v]", i+2))
+				spacing := ""
+				if 12-i < 10 {
+					spacing = " "
+				}
+				s += blue.Render(fmt.Sprintf("[%v]", 12-i)) + background.Render(spacing)
 			}
 		}
 
 	}
-	s += "\n\n\nSkips:  "
+	s += "\n\n\nPasses:  "
 	used := 4 - skips
 	for range used {
 		s += "[X]"
@@ -167,8 +240,7 @@ func CardRender(pos [2]uint, width int, height int, skips int, card game_logic.C
 	// opts[pos[1]].display = hovering.Render(opts[pos[1]].display)
 	// s += opts[0].display + spacing + opts[1].display + spacing + opts[2].display
 	s = cardstyle.Render(s)
-	tmpBorder := lipgloss.NewStyle().Border(lipgloss.BlockBorder(), false, false, true, false).Margin(2)
-	return tmpBorder.Render(s)
+	return s
 }
 
 func DiceRender(dice game_logic.Dice, turn bool) string {

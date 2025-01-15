@@ -121,7 +121,6 @@ func (m Model) menuUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) takeTurn(b bool, b2 bool, turn bool, playerCard game_logic.Card) (Model, tea.Cmd) {
-    fmt.Printf("\ngone: %t\ngone2: %t\nb2: %t\n", m.Game.Gone[m.Player], m.Game.Gone2[m.Player], b2)
 	gone1 := m.Game.Gone[m.Player]
 	gone2 := m.Game.Gone2[m.Player]
 	if !b {
@@ -148,6 +147,15 @@ func (m Model) takeTurn(b bool, b2 bool, turn bool, playerCard game_logic.Card) 
 		m.App.Games[m.Game.Key].Dice.Roll()
 		m.App.send("")
 	}
+	if turn && m.Game.Gone2[m.Player] {
+		card := m.Game.Cards[m.Player]
+		card.TurnOver = true
+		m.Game.Cards[m.Player] = card
+	} else if !turn && m.Game.Gone[m.Player] {
+		card := m.Game.Cards[m.Player]
+		card.TurnOver = true
+		m.Game.Cards[m.Player] = card
+	}
 	return m, nil
 }
 
@@ -166,31 +174,33 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 		switch m.Pos[0] {
 		case 0:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Red, b, b2 = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red})
+			playerCard.Red, b, b2 = playerCard.Red.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Red}, false)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 1:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Yellow, b, b2 = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow})
+			playerCard.Yellow, b, b2 = playerCard.Yellow.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Yellow}, false)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 2:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Green, b, b2 = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green})
+			playerCard.Green, b, b2 = playerCard.Green.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Green}, true)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		case 3:
 			playerCard := m.Game.Cards[m.Player]
-			playerCard.Blue, b, b2 = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue})
+			playerCard.Blue, b, b2 = playerCard.Blue.TryMark(int(m.Pos[1]), turn, [3]game_logic.Die{m.Game.Dice.White1, m.Game.Dice.White2, m.Game.Dice.Blue}, true)
 			tmp, tmp2 := m.takeTurn(b, b2, turn, playerCard)
 			m.Game.Cards[m.Player] = tmp.Game.Cards[m.Player]
 			return m, tmp2
 		}
 	case "p":
-		fmt.Printf("\ngone: %t\ngone2: %t\n", m.Game.Gone[m.Player], m.Game.Gone2[m.Player])
+		card := m.Game.Cards[m.Player]
+		card.TurnOver = true
+		m.Game.Cards[m.Player] = card
 		if !turn {
 			m.Game.Gone[m.Player] = true
 			if m.Game.TurnCheck() {
@@ -198,7 +208,7 @@ func (m Model) cardUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.Game.Dice.Roll()
 				m.App.send("")
 			}
-			return m, nil
+            return m, nil
 		}
 
 		if m.Game.Gone[m.Player] {

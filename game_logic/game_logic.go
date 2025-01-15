@@ -32,18 +32,18 @@ type Die int
 type Row [11]bool
 
 type Card struct {
-	Player string
-	Red    Row
-	Yellow Row
-	Green  Row
-	Blue   Row
-	Skips  int
+	TurnOver bool
+	Player   string
+	Red      Row
+	Yellow   Row
+	Green    Row
+	Blue     Row
+	Skips    int
 }
 
 type Turn int
 
 func (t *Turn) nextTurn(players int) {
-	fmt.Println("\nnextturn called\n")
 	*t++
 	if int(*t) > players-1 {
 		*t = 0
@@ -51,8 +51,31 @@ func (t *Turn) nextTurn(players int) {
 }
 
 // Attempts to mark row at index i. Returns t/f on succes/fail
-func (r Row) TryMark(i int, turn bool, dice [3]Die) (Row, bool, bool) {
-	cmp := i + 2
+func (r Row) TryMark(i int, turn bool, dice [3]Die, large bool) (Row, bool, bool) {
+	if !large {
+		cmp := i + 2
+		if cmp == int(dice[0]+dice[1]) {
+			for _, v := range r[i:] {
+				if v {
+					return r, false, false
+				}
+			}
+			r[i] = true
+			return r, true, false
+		}
+		if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
+			for _, v := range r[i:] {
+				if v {
+					return r, false, false
+				}
+			}
+			r[i] = true
+			return r, true, true
+		}
+		return r, false, false
+	}
+
+	cmp := 12 - i
 	if turn && (cmp == int(dice[0]+dice[2]) || cmp == int(dice[1]+dice[2])) {
 		for _, v := range r[i:] {
 			if v {
@@ -110,21 +133,24 @@ func (g *Game) ResetTurns() {
 	}
 	g.Gone = b
 	g.Gone2 = c
+
+	for k, v := range g.Cards {
+		v.TurnOver = false
+		g.Cards[k] = v
+	}
+	fmt.Printf("\ncards: %+v\n", g.Cards)
 }
 
 // T if everyone has gone, F otherwise
 func (g *Game) TurnCheck() bool {
 	for _, v := range g.Gone {
 		if !v {
-			fmt.Println("returning false")
 			return false
 		}
 	}
 	for _, v := range g.Gone2 {
 		if v {
 			g.Turn.nextTurn(len(g.Players))
-			fmt.Println("returning true")
-			fmt.Printf("\ngone1: %+v\ngone2: %+v\n", g.Gone, g.Gone2)
 			return true
 		}
 	}
